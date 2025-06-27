@@ -1,28 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: const Color(0xFFF8F9FB),
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(AppColors.primary),
         brightness: Brightness.light,
-        background: Color(0xFFF8F9FB),
         surface: Colors.white,
         primary: Color(AppColors.primary),
         onPrimary: Colors.white,
         secondary: Color(AppColors.primary),
         onSecondary: Colors.white,
-        onBackground: Color(0xFF222222),
         onSurface: Color(0xFF222222),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
         foregroundColor: Color(AppColors.primary),
         elevation: 0.5,
-        centerTitle: true,
+        centerTitle: false,
         titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.bold,
@@ -101,10 +100,13 @@ class AppTheme {
       ),
       dividerColor: const Color(0xFFE0E0E0),
     );
+    return base.copyWith(
+      textTheme: GoogleFonts.lexendTextTheme(base.textTheme),
+    );
   }
 
   static ThemeData get darkTheme {
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(AppColors.primary),
@@ -146,6 +148,9 @@ class AppTheme {
         backgroundColor: Color(AppColors.primary),
         foregroundColor: Colors.white,
       ),
+    );
+    return base.copyWith(
+      textTheme: GoogleFonts.lexendTextTheme(base.textTheme),
     );
   }
 }

@@ -37,6 +37,7 @@ dependencies:
   flutter_modular: ^6.4.1
   geolocator: ^9.0.2
   geocoding: ^2.0.0
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

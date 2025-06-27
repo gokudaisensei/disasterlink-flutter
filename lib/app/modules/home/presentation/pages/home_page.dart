@@ -86,7 +86,6 @@ class _HomePageState extends State<HomePage> {
           'DisasterLink',
           style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: colorScheme.primary,
         actions: [
           Row(
             children: [
