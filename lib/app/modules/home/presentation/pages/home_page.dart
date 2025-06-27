@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../components/greeting_header.dart';
@@ -146,9 +147,10 @@ class _HomePageState extends State<HomePage> {
                   isDarkMode: isDarkMode,
                 ),
                 QuickActionCard(
-                  title: 'Community Map',
-                  icon: Icons.map,
+                  title: 'Bluetooth Mesh',
+                  icon: Icons.bluetooth,
                   isDarkMode: isDarkMode,
+                  onTap: () => Modular.to.pushNamed('/bluetooth/'),
                 ),
               ],
             ),
