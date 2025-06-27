@@ -132,9 +132,10 @@ class _HomePageState extends State<HomePage> {
                   isDarkMode: isDarkMode,
                 ),
                 QuickActionCard(
-                  title: 'Report Resource Need',
-                  icon: Icons.report,
+                  title: 'Community Network',
+                  icon: Icons.people,
                   isDarkMode: isDarkMode,
+                  onTap: () => Modular.to.pushNamed('/community/'),
                 ),
                 QuickActionCard(
                   title: 'Share My Status',
