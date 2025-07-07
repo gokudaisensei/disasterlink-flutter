@@ -25,9 +25,11 @@ class _BluetoothPageState extends State<BluetoothPage> {
     _bluetoothStore = Modular.get<BluetoothStore>();
     _bluetoothStore.addListener(_onBluetoothStateChanged);
 
-    // Initialize the store
+    // Check if store needs initialization (it should already be initialized by the app)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _bluetoothStore.initialize();
+      if (!_bluetoothStore.isInitialized) {
+        _bluetoothStore.initialize();
+      }
     });
   }
 

@@ -17,7 +17,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String _currentLocation = 'Fetching location...';
   DateTime? _lastUpdated;
-
+  
   @override
   void initState() {
     super.initState();
