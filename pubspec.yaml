@@ -38,6 +38,10 @@ dependencies:
   geolocator: ^9.0.2
   geocoding: ^2.0.0
   google_fonts: ^6.2.1
+  
+  # BLE Dependencies
+  flutter_blue_plus: ^1.32.12
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
