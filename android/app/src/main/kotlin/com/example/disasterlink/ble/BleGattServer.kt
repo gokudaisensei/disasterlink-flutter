@@ -355,24 +355,33 @@ class BleGattServer(private val context: Context) : MethodCallHandler {
     /** Handle incoming fragment and attempt message reassembly */
     private fun handleFragment(fragment: MessageFragment) {
         val messageId = fragment.messageId.toString()
+        Log.d(TAG, "handleFragment: Processing fragment for messageId=$messageId")
 
         // Initialize fragment buffer if needed
         if (!fragmentBuffers.containsKey(messageId)) {
             fragmentBuffers[messageId] = MutableList(fragment.totalFragments) { null }
             fragmentTimestamps[messageId] = System.currentTimeMillis()
+            Log.d(TAG, "handleFragment: Initialized buffer for messageId=$messageId with ${fragment.totalFragments} fragments")
         }
 
         // Add fragment to buffer
         val buffer = fragmentBuffers[messageId]!!
         if (fragment.fragmentIndex < buffer.size) {
             buffer[fragment.fragmentIndex] = fragment
+            Log.d(TAG, "handleFragment: Added fragment ${fragment.fragmentIndex}/${fragment.totalFragments} for messageId=$messageId")
         }
 
         // Check if all fragments received
+        val receivedFragments = buffer.count { it != null }
+        Log.d(TAG, "handleFragment: Have $receivedFragments/${fragment.totalFragments} fragments for messageId=$messageId")
+        
         if (buffer.all { it != null }) {
+            Log.d(TAG, "handleFragment: All fragments received for messageId=$messageId, reassembling...")
+            
             val completeMessage = reassembleMessage(buffer.filterNotNull())
             if (completeMessage != null) {
                 currentMessage = completeMessage
+                Log.d(TAG, "handleFragment: Successfully reassembled message, notifying Flutter layer")
 
                 // Notify Flutter layer
                 mainHandler.post {
@@ -385,6 +394,8 @@ class BleGattServer(private val context: Context) : MethodCallHandler {
                 // Clean up
                 fragmentBuffers.remove(messageId)
                 fragmentTimestamps.remove(messageId)
+            } else {
+                Log.e(TAG, "handleFragment: Failed to reassemble message for messageId=$messageId")
             }
         }
     }
@@ -514,9 +525,14 @@ class BleGattServer(private val context: Context) : MethodCallHandler {
 
                     when (characteristic.uuid) {
                         WRITE_CHARACTERISTIC_UUID -> {
+                            Log.d(TAG, "onCharacteristicWriteRequest: Received ${value.size} bytes from ${device.address}")
+                            
                             val fragment = parseFragment(value)
                             if (fragment != null) {
+                                Log.d(TAG, "Parsed fragment: messageId=${fragment.messageId}, fragmentIndex=${fragment.fragmentIndex}, totalFragments=${fragment.totalFragments}")
                                 handleFragment(fragment)
+                            } else {
+                                Log.e(TAG, "Failed to parse fragment from received data")
                             }
 
                             if (responseNeeded) {

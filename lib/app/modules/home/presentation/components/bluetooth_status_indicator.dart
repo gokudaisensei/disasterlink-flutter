@@ -6,7 +6,8 @@ class BluetoothStatusIndicator extends StatefulWidget {
   const BluetoothStatusIndicator({super.key});
 
   @override
-  State<BluetoothStatusIndicator> createState() => _BluetoothStatusIndicatorState();
+  State<BluetoothStatusIndicator> createState() =>
+      _BluetoothStatusIndicatorState();
 }
 
 class _BluetoothStatusIndicatorState extends State<BluetoothStatusIndicator> {
@@ -18,7 +19,7 @@ class _BluetoothStatusIndicatorState extends State<BluetoothStatusIndicator> {
     super.initState();
     // Try to get the store if it exists
     try {
-      _bluetoothStore = Modular.get(const Object());
+      _bluetoothStore = Modular.get<Object>(key: 'BluetoothStore');
       _bluetoothStore!.addListener(_onStoreChanged);
       _updateStatus();
     } catch (e) {
@@ -35,7 +36,7 @@ class _BluetoothStatusIndicatorState extends State<BluetoothStatusIndicator> {
   void _updateStatus() {
     final isInitialized = _bluetoothStore?.isInitialized ?? false;
     final isEnabled = _bluetoothStore?.isBluetoothEnabled ?? false;
-    
+
     setState(() {
       _isActive = isInitialized && isEnabled;
     });
@@ -50,7 +51,7 @@ class _BluetoothStatusIndicatorState extends State<BluetoothStatusIndicator> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    
+
     return Row(
       children: [
         Text(

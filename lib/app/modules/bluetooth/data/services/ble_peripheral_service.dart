@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import '../../domain/constants/ble_constants.dart';
 import '../../domain/models/message_models.dart';
@@ -74,6 +73,9 @@ class BlePeripheralService {
   /// Setup method channel to handle callbacks from native code
   void _setupMethodChannelHandler() {
     _channel.setMethodCallHandler((call) async {
+      print('DEBUG_PERIPHERAL: Method call received: ${call.method}');
+      print('DEBUG_PERIPHERAL: Arguments type: ${call.arguments?.runtimeType}');
+
       switch (call.method) {
         case 'onDeviceConnected':
           _handleDeviceConnected(call.arguments);
@@ -82,6 +84,7 @@ class BlePeripheralService {
           _handleDeviceDisconnected(call.arguments);
           break;
         case 'onMessageReceived':
+          print('DEBUG_PERIPHERAL: Message received from Kotlin side');
           _handleMessageReceived(call.arguments);
           break;
         case 'onAdvertisingStarted':
@@ -218,13 +221,36 @@ class BlePeripheralService {
   /// Handle received message event
   void _handleMessageReceived(Map<String, dynamic> data) {
     try {
-      final messageData = data['messageData'] as Uint8List;
+      print('DEBUG_PERIPHERAL_RECEIVE: Raw data received: $data');
+
+      // Handle different data formats from Kotlin
+      Uint8List messageData;
+      if (data['messageData'] is Uint8List) {
+        messageData = data['messageData'] as Uint8List;
+      } else if (data['messageData'] is List<int>) {
+        messageData = Uint8List.fromList(List<int>.from(data['messageData']));
+      } else if (data['messageData'] is String) {
+        // Handle base64 encoded data
+        messageData = Uint8List.fromList(
+          List<int>.from(data['messageData'].codeUnits),
+        );
+      } else {
+        print(
+          'ERROR: Unknown message data format: ${data['messageData'].runtimeType}',
+        );
+        return;
+      }
+
+      print('DEBUG_PERIPHERAL_RECEIVE: Processing ${messageData.length} bytes');
+
       final message = DisasterLinkMessage.fromBytes(messageData);
 
       _messageReceivedController.add(message);
       print('Message received: ${message.id} from ${message.senderName}');
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error handling received message: $e');
+      print('Stack trace: $stackTrace');
+      print('Raw data that caused error: $data');
     }
   }
 

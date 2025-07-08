@@ -388,6 +388,9 @@ class BluetoothStore extends ChangeNotifier {
         priority: priority,
       );
 
+      // Debug logging for message sending
+      debugLogMessageSend(message, targetDevice);
+
       bool success = false;
 
       // Send via central service
@@ -409,8 +412,20 @@ class BluetoothStore extends ChangeNotifier {
       if (success) {
         _sentMessages.add(message);
         print('Message sent successfully: ${message.id}');
+
+        // Analyze performance after successful send
+        debugAnalyzeMessagePerformance();
+
+        // Track delivery status for this message
+        debugTrackMessageDelivery(message, false);
       } else {
         _setError('Failed to send message');
+
+        // Debug the failed transmission
+        print('DEBUG_SEND_FAILURE: Message ${message.id} failed to send');
+        print('  Central connection state: $_centralConnectionState');
+        print('  Peripheral state: $_peripheralState');
+        print('  Connected devices count: ${_connectedDevices.length}');
       }
     } catch (e) {
       _setError('Send message error: $e');
@@ -440,6 +455,9 @@ class BluetoothStore extends ChangeNotifier {
         additionalInfo: additionalInfo,
       );
 
+      // Debug logging for emergency SOS sending
+      debugLogMessageSend(message, targetDevice);
+
       bool success = false;
 
       // Send via central service
@@ -461,6 +479,8 @@ class BluetoothStore extends ChangeNotifier {
       if (success) {
         _sentMessages.add(message);
         print('Emergency SOS sent successfully: ${message.id}');
+        // Analyze performance after successful send
+        debugAnalyzeMessagePerformance();
       } else {
         _setError('Failed to send emergency SOS');
       }
@@ -492,6 +512,9 @@ class BluetoothStore extends ChangeNotifier {
         locationName: locationName,
       );
 
+      // Debug logging for location share sending
+      debugLogMessageSend(message, targetDevice);
+
       bool success = false;
 
       // Send via central service
@@ -513,6 +536,8 @@ class BluetoothStore extends ChangeNotifier {
       if (success) {
         _sentMessages.add(message);
         print('Location shared successfully: ${message.id}');
+        // Analyze performance after successful send
+        debugAnalyzeMessagePerformance();
       } else {
         _setError('Failed to share location');
       }
@@ -603,14 +628,38 @@ class BluetoothStore extends ChangeNotifier {
   /// Handle message received
   void _handleMessageReceived(DisasterLinkMessage message, String source) {
     _receivedMessages.add(message);
+
+    // Debug logging for received message
+    debugLogMessageReceive(message, source);
+
     print(
       'Message received from $source: ${message.id} - ${message.type.value}',
     );
+
+    // Check if this is an acknowledgment for one of our sent messages
+    bool isAckForOurMessage = false;
+    if (message.type == MessageType.acknowledgment &&
+        message.payload.containsKey('originalMessageId')) {
+      final originalMsgId = message.payload['originalMessageId'] as String;
+      final sentMessage = _sentMessages.any((m) => m.id == originalMsgId);
+      if (sentMessage) {
+        isAckForOurMessage = true;
+        print(
+          'DEBUG_ACK_RECEIVED: Received acknowledgment for message $originalMsgId',
+        );
+      }
+    }
 
     // Handle acknowledgment if required
     if (message.requiresAck) {
       _sendAcknowledgment(message);
     }
+
+    // Enhanced tracking for message delivery status
+    debugTrackMessageDelivery(message, isAckForOurMessage);
+
+    // Analyze message performance after receiving a new message
+    debugAnalyzeMessagePerformance();
 
     notifyListeners();
   }
@@ -624,6 +673,9 @@ class BluetoothStore extends ChangeNotifier {
         originalMessageId: originalMessage.id,
         recipientId: originalMessage.senderId,
       );
+
+      // Debug logging for acknowledgment sending
+      debugLogMessageSend(ackMessage, null);
 
       // Send acknowledgment via both services
       await _centralService.broadcastMessage(ackMessage);
@@ -702,6 +754,297 @@ class BluetoothStore extends ChangeNotifier {
           .where((m) => m.type == MessageType.emergencySos)
           .length,
     };
+  }
+
+  /// Debug utility: Log message sending details
+  void debugLogMessageSend(
+    DisasterLinkMessage message,
+    BluetoothDevice? targetDevice,
+  ) {
+    final timestamp = DateTime.now().toIso8601String();
+    final targetInfo = targetDevice != null
+        ? 'to specific device ${targetDevice.remoteId.str}'
+        : 'as broadcast';
+
+    print('DEBUG_SEND [$timestamp] Message ${message.id}:');
+    print('  Type: ${message.type.value}');
+    print('  Sender: ${message.senderName} (${message.senderId})');
+    print('  Payload: ${_truncateContent(message.payload.toString())}');
+    print('  Target: $targetInfo');
+    print('  Size: ${_estimateMessageSize(message)} bytes');
+  }
+
+  /// Debug utility: Log message receiving details
+  void debugLogMessageReceive(DisasterLinkMessage message, String source) {
+    final timestamp = DateTime.now().toIso8601String();
+
+    print('DEBUG_RECEIVE [$timestamp] Message ${message.id}:');
+    print('  Type: ${message.type.value}');
+    print('  Sender: ${message.senderName} (${message.senderId})');
+    print('  Payload: ${_truncateContent(message.payload.toString())}');
+    print('  Source: $source');
+    print('  Receipt Time: $timestamp');
+
+    // Additional analytics for message types
+    switch (message.type) {
+      case MessageType.textMessage:
+        final textContent = message.payload['text'] as String?;
+        print('  Text Length: ${textContent?.length ?? 0} chars');
+        break;
+      case MessageType.emergencySos:
+        if (message.payload.containsKey('location')) {
+          final location = message.payload['location'];
+          print(
+            '  Location: lat=${location['latitude']}, lng=${location['longitude']}',
+          );
+        }
+        break;
+      case MessageType.locationShare:
+        if (message.payload.containsKey('location')) {
+          final location = message.payload['location'];
+          print(
+            '  Location: lat=${location['latitude']}, lng=${location['longitude']}',
+          );
+          print(
+            '  Location Name: ${message.payload['locationName'] ?? 'Unnamed location'}',
+          );
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /// Enhanced debug utility: Track message delivery status
+  void debugTrackMessageDelivery(
+    DisasterLinkMessage message,
+    bool isAcknowledged,
+  ) {
+    final timestamp = DateTime.now().toIso8601String();
+    final age = DateTime.now().difference(message.timestamp).inSeconds;
+
+    print('DEBUG_MESSAGE_TRACKING [$timestamp]:');
+    print('  Message ID: ${message.id}');
+    print('  Type: ${message.type.value}');
+    print('  Age: $age seconds');
+    print('  Is Acknowledged: $isAcknowledged');
+
+    // Check for connected devices that could have received this message
+    print('  Connected Central Devices: ${_connectedDevices.length}');
+    for (final device in _connectedDevices) {
+      print('    - ${device.remoteId.str} (${device.platformName})');
+    }
+
+    print(
+      '  Connected Peripheral Devices: ${_peripheralConnectedDevices.length}',
+    );
+    for (final entry in _peripheralConnectedDevices.entries) {
+      print('    - ${entry.key} (${entry.value['deviceName'] ?? 'Unknown'})');
+    }
+
+    // Check connectivity details
+    print('  Bluetooth Enabled: $_isBluetoothEnabled');
+    print('  Central State: $_centralConnectionState');
+    print('  Peripheral State: $_peripheralState');
+  }
+
+  /// Debug utility: Check message transmissions for a specific time window
+  Future<void> debugCheckRecentMessageTransmissions({
+    int lastMinutes = 5,
+  }) async {
+    final cutoffTime = DateTime.now().subtract(Duration(minutes: lastMinutes));
+
+    // Recent messages
+    final recentSent = _sentMessages
+        .where((msg) => msg.timestamp.isAfter(cutoffTime))
+        .toList();
+    final recentReceived = _receivedMessages
+        .where((msg) => msg.timestamp.isAfter(cutoffTime))
+        .toList();
+
+    print('DEBUG_RECENT_MESSAGES (Last $lastMinutes minutes):');
+    print('  Recent Sent: ${recentSent.length}');
+    print('  Recent Received: ${recentReceived.length}');
+
+    // Check for sent messages without acknowledgments
+    if (recentSent.isNotEmpty) {
+      final pendingAcks = recentSent
+          .where(
+            (msg) =>
+                msg.requiresAck &&
+                !_receivedMessages.any(
+                  (ack) =>
+                      ack.type == MessageType.acknowledgment &&
+                      ack.payload['originalMessageId'] == msg.id,
+                ),
+          )
+          .toList();
+
+      print(
+        '  Pending Acknowledgments: ${pendingAcks.length}/${recentSent.where((m) => m.requiresAck).length}',
+      );
+
+      for (final msg in pendingAcks) {
+        final age = DateTime.now().difference(msg.timestamp).inSeconds;
+        print('    - ID: ${msg.id}, Type: ${msg.type.value}, Age: ${age}s');
+      }
+    }
+
+    // Check message delivery channels
+    print('  Central Service Status: Available');
+    print('  Peripheral Service Status: Available');
+
+    try {
+      // Check BLE state
+      final isBluetoothOn = await FlutterBluePlus.isOn;
+      print('  Bluetooth Hardware Status: ${isBluetoothOn ? "ON" : "OFF"}');
+    } catch (e) {
+      print('  Error checking Bluetooth status: $e');
+    }
+  }
+
+  /// Helper to truncate content for logging
+  String _truncateContent(String content) {
+    const maxLength = 100;
+    if (content.length <= maxLength) return content;
+    return '${content.substring(0, maxLength)}...';
+  }
+
+  /// Helper to estimate message size in bytes
+  int _estimateMessageSize(DisasterLinkMessage message) {
+    // Rough estimate of JSON serialization size
+    final jsonString = message.toJson().toString();
+    return jsonString.length;
+  }
+
+  /// Debug utility: Analyze message transmission performance
+  void debugAnalyzeMessagePerformance() {
+    if (_sentMessages.isEmpty && _receivedMessages.isEmpty) {
+      print('DEBUG_PERFORMANCE: No messages to analyze');
+      return;
+    }
+
+    // Message type distribution
+    final Map<MessageType, int> sentByType = {};
+    final Map<MessageType, int> receivedByType = {};
+
+    for (final msg in _sentMessages) {
+      sentByType[msg.type] = (sentByType[msg.type] ?? 0) + 1;
+    }
+
+    for (final msg in _receivedMessages) {
+      receivedByType[msg.type] = (receivedByType[msg.type] ?? 0) + 1;
+    }
+
+    print('DEBUG_PERFORMANCE ANALYSIS:');
+    print('  Total Sent: ${_sentMessages.length}');
+    print('  Total Received: ${_receivedMessages.length}');
+    print('  Sent by type: ${_formatTypeDistribution(sentByType)}');
+    print('  Received by type: ${_formatTypeDistribution(receivedByType)}');
+
+    // Calculate success rate for acknowledgments if any
+    final sentWithAckRequired = _sentMessages
+        .where((m) => m.requiresAck)
+        .length;
+    final receivedAcks = _receivedMessages
+        .where((m) => m.type == MessageType.acknowledgment)
+        .length;
+
+    if (sentWithAckRequired > 0) {
+      final ackRate = (receivedAcks / sentWithAckRequired) * 100;
+      print('  Acknowledgment rate: ${ackRate.toStringAsFixed(1)}%');
+    }
+  }
+
+  /// Format type distribution for logging
+  String _formatTypeDistribution(Map<MessageType, int> typeMap) {
+    return typeMap.entries.map((e) => '${e.key.value}:${e.value}').join(', ');
+  }
+
+  /// Debug utility: Track message delivery and acknowledgment by ID
+  void debugTrackMessageDeliveryById(String messageId) {
+    DisasterLinkMessage? message;
+    try {
+      message = _sentMessages.firstWhere((m) => m.id == messageId);
+    } catch (e) {
+      message = null;
+    }
+
+    if (message == null) {
+      print('DEBUG_TRACK: Message $messageId not found in sent messages');
+      return;
+    }
+
+    // Find any acknowledgments for this message
+    final acks = _receivedMessages
+        .where(
+          (m) =>
+              m.type == MessageType.acknowledgment &&
+              m.payload['originalMessageId'] == messageId,
+        )
+        .toList();
+
+    print('DEBUG_TRACK Message $messageId:');
+    print('  Type: ${message.type.value}');
+    print('  Sent time: ${message.timestamp}');
+    print('  Current time: ${DateTime.now().toIso8601String()}');
+    print('  Requires acknowledgment: ${message.requiresAck}');
+    print('  Acknowledgments received: ${acks.length}');
+
+    if (acks.isNotEmpty) {
+      for (final ack in acks) {
+        // Calculate time difference
+        final latencyMs = ack.timestamp
+            .difference(message.timestamp)
+            .inMilliseconds;
+
+        print('  Ack from: ${ack.senderName} (${ack.senderId})');
+        print('  Ack latency: ${latencyMs}ms');
+      }
+    }
+
+    // Show current connection status
+    print('  Current connections: ${totalConnectedDevices}');
+    print('  Central connections: ${_connectedDevices.length}');
+    print('  Peripheral connections: ${_peripheralConnectedDevices.length}');
+  }
+
+  /// Debug utility: Check recent message transmissions by count
+  void debugCheckRecentMessageTransmissionsByCount({int count = 5}) {
+    final recentMessages = _sentMessages.length > count
+        ? _sentMessages.sublist(_sentMessages.length - count)
+        : _sentMessages;
+
+    print('DEBUG_RECENT_TRANSMISSIONS:');
+    print('  Showing last ${recentMessages.length} messages:');
+
+    for (final msg in recentMessages) {
+      final acks = _receivedMessages
+          .where(
+            (m) =>
+                m.type == MessageType.acknowledgment &&
+                m.payload['originalMessageId'] == msg.id,
+          )
+          .length;
+
+      print('  Message ${msg.id}:');
+      print('    Type: ${msg.type.value}');
+      print('    Sent: ${msg.timestamp}');
+      print('    Requires ack: ${msg.requiresAck}');
+      print('    Acks received: $acks');
+    }
+
+    // List connected devices
+    print('  Connected devices:');
+    for (final device in _connectedDevices) {
+      print('    Central: ${device.platformName} (${device.remoteId.str})');
+    }
+
+    for (final entry in _peripheralConnectedDevices.entries) {
+      print(
+        '    Peripheral: ${entry.value['deviceName'] ?? 'Unknown'} (${entry.key})',
+      );
+    }
   }
 
   @override

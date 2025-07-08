@@ -4,11 +4,11 @@ import 'app/app_module.dart';
 import 'app/app_widget.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized(); 
-  
+  WidgetsFlutterBinding.ensureInitialized();
+
   // Create the app
   final app = ModularApp(module: AppModule(), child: const AppWidget());
-  
+
   // Initialize Bluetooth after the first frame to ensure it persists
   // even when navigating away from the Bluetooth page
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -16,6 +16,6 @@ void main() {
     // This ensures that once we navigate to the Bluetooth page once,
     // the store will stay initialized even when returning to the Home page
   });
-  
+
   runApp(app);
 }

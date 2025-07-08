@@ -3,11 +3,9 @@ import 'package:flutter_modular/flutter_modular.dart';
 import '../stores/real_bluetooth_store.dart';
 import '../components/bluetooth_header.dart';
 import '../components/real_bluetooth_status_card.dart';
-import '../components/real_device_list_section.dart';
-import '../components/real_connection_stats.dart';
-import '../components/message_history_section.dart';
-import '../components/send_message_dialog.dart';
-import '../../domain/constants/ble_constants.dart';
+import '../components/devices_tab.dart';
+import '../components/messaging_tab.dart';
+import '../components/messages_tab.dart';
 
 class BluetoothPage extends StatefulWidget {
   const BluetoothPage({super.key});
@@ -16,14 +14,17 @@ class BluetoothPage extends StatefulWidget {
   State<BluetoothPage> createState() => _BluetoothPageState();
 }
 
-class _BluetoothPageState extends State<BluetoothPage> {
+class _BluetoothPageState extends State<BluetoothPage>
+    with TickerProviderStateMixin {
   late final BluetoothStore _bluetoothStore;
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _bluetoothStore = Modular.get<BluetoothStore>();
     _bluetoothStore.addListener(_onBluetoothStateChanged);
+    _tabController = TabController(length: 3, vsync: this);
 
     // Check if store needs initialization (it should already be initialized by the app)
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -36,6 +37,7 @@ class _BluetoothPageState extends State<BluetoothPage> {
   @override
   void dispose() {
     _bluetoothStore.removeListener(_onBluetoothStateChanged);
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -80,26 +82,6 @@ class _BluetoothPageState extends State<BluetoothPage> {
             onSelected: _handleMenuAction,
             itemBuilder: (context) => [
               const PopupMenuItem(
-                value: 'emergency_sos',
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Send Emergency SOS'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'share_location',
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Text('Share Location'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
                 value: 'connection_stats',
                 child: Row(
                   children: [
@@ -113,135 +95,88 @@ class _BluetoothPageState extends State<BluetoothPage> {
           ),
           const SizedBox(width: 8),
         ],
+        bottom: _bluetoothStore.isBluetoothEnabled
+            ? TabBar(
+                controller: _tabController,
+                labelColor: colorScheme.primary,
+                unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+                indicatorColor: colorScheme.primary,
+                tabs: const [
+                  Tab(icon: Icon(Icons.devices), text: 'Devices'),
+                  Tab(icon: Icon(Icons.send), text: 'Send'),
+                  Tab(icon: Icon(Icons.message), text: 'Messages'),
+                ],
+              )
+            : null,
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          if (_bluetoothStore.isBluetoothEnabled) {
-            await _bluetoothStore.startScanning();
-          }
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              const BluetoothHeader(),
-              const SizedBox(height: 20),
-
-              // Status Card
-              RealBluetoothStatusCard(
-                store: _bluetoothStore,
-                onToggleBluetooth: _bluetoothStore.toggleBluetooth,
-                onTogglePeripheral: _togglePeripheralMode,
-              ),
-              const SizedBox(height: 20),
-
-              if (_bluetoothStore.isBluetoothEnabled) ...[
-                // Connection Statistics
-                RealConnectionStats(store: _bluetoothStore),
-                const SizedBox(height: 24),
-
-                // Connected Devices (Central)
-                RealDeviceListSection(
-                  title: 'Connected Devices (Central)',
-                  devices: _bluetoothStore.connectedDevices,
-                  emptyMessage: 'No devices connected as central',
-                  emptyIcon: Icons.bluetooth_disabled,
-                  onDeviceAction: (device) =>
-                      _bluetoothStore.disconnectFromDevice(device),
-                  actionLabel: 'Disconnect',
-                  actionIcon: Icons.link_off,
-                  actionColor: Colors.red,
-                  isLoading:
-                      _bluetoothStore.centralConnectionState ==
-                      BleConnectionState.disconnecting,
-                ),
-                const SizedBox(height: 24),
-
-                // Available Devices
-                RealDeviceListSection(
-                  title: 'Available Devices',
-                  devices: _bluetoothStore.discoveredDevices,
-                  emptyMessage: _bluetoothStore.isScanning
-                      ? 'Scanning for emergency devices...'
-                      : 'No devices found. Pull to refresh or tap scan.',
-                  emptyIcon: _bluetoothStore.isScanning
-                      ? Icons.bluetooth_searching
-                      : Icons.bluetooth,
-                  onDeviceAction: (device) =>
-                      _bluetoothStore.connectToDevice(device),
-                  actionLabel: 'Connect',
-                  actionIcon: Icons.link,
-                  isLoading:
-                      _bluetoothStore.centralConnectionState ==
-                      BleConnectionState.connecting,
-                ),
-                const SizedBox(height: 24),
-
-                // Peripheral Connections
-                PeripheralDeviceListSection(
-                  devices: _bluetoothStore.peripheralConnectedDevices,
-                ),
-                const SizedBox(height: 24),
-
-                // Message History
-                MessageHistorySection(
-                  messages: [
-                    ..._bluetoothStore.receivedMessages,
-                    ..._bluetoothStore.sentMessages,
-                  ],
-                ),
-              ],
-
-              // Error handling
-              if (_bluetoothStore.errorMessage != null) ...[
-                const SizedBox(height: 16),
+      body: _bluetoothStore.isBluetoothEnabled
+          ? Column(
+              children: [
+                // Status Card
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade200),
+                  margin: const EdgeInsets.all(16),
+                  child: RealBluetoothStatusCard(
+                    store: _bluetoothStore,
+                    onToggleBluetooth: _bluetoothStore.toggleBluetooth,
+                    onTogglePeripheral: _togglePeripheralMode,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade700),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _bluetoothStore.errorMessage!,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.red.shade700,
+                ),
+                // Error handling banner
+                if (_bluetoothStore.errorMessage != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.red.shade50,
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _bluetoothStore.errorMessage!,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.red.shade700,
+                            ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: _bluetoothStore.clearError,
-                        icon: Icon(Icons.close, color: Colors.red.shade700),
-                        iconSize: 20,
-                      ),
+                        IconButton(
+                          onPressed: _bluetoothStore.clearError,
+                          icon: Icon(Icons.close, color: Colors.red.shade700),
+                          iconSize: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                // Tab content
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      DevicesTab(bluetoothStore: _bluetoothStore),
+                      MessagingTab(bluetoothStore: _bluetoothStore),
+                      MessagesTab(bluetoothStore: _bluetoothStore),
                     ],
                   ),
                 ),
               ],
-
-              const SizedBox(height: 100), // Extra space at bottom
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: _bluetoothStore.isBluetoothEnabled
-          ? FloatingActionButton.extended(
-              onPressed: _showSendMessageDialog,
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              icon: const Icon(Icons.message),
-              label: const Text('Send Message'),
             )
-          : null,
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const BluetoothHeader(),
+                  const SizedBox(height: 20),
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    child: RealBluetoothStatusCard(
+                      store: _bluetoothStore,
+                      onToggleBluetooth: _bluetoothStore.toggleBluetooth,
+                      onTogglePeripheral: _togglePeripheralMode,
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -255,42 +190,10 @@ class _BluetoothPageState extends State<BluetoothPage> {
 
   void _handleMenuAction(String action) async {
     switch (action) {
-      case 'emergency_sos':
-        await _bluetoothStore.sendEmergencySOS(
-          additionalInfo: 'Emergency SOS sent from DisasterLink app',
-        );
-        _showSnackBar(
-          'Emergency SOS sent to all connected devices',
-          Colors.red,
-        );
-        break;
-      case 'share_location':
-        await _bluetoothStore.sendLocationShare(
-          locationName: 'Current Location',
-        );
-        _showSnackBar('Location shared with network', Colors.blue);
-        break;
       case 'connection_stats':
         _showConnectionStatsDialog();
         break;
     }
-  }
-
-  void _showSendMessageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => SendMessageDialog(
-        onSendMessage: (text, priority, targetDevice) async {
-          await _bluetoothStore.sendTextMessage(
-            text: text,
-            targetDevice: targetDevice,
-            priority: priority,
-          );
-          _showSnackBar('Message sent successfully', Colors.green);
-        },
-        availableDevices: _bluetoothStore.connectedDevices,
-      ),
-    );
   }
 
   void _showConnectionStatsDialog() {
@@ -344,17 +247,6 @@ class _BluetoothPageState extends State<BluetoothPage> {
             child: const Text('Close'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
       ),
     );
   }

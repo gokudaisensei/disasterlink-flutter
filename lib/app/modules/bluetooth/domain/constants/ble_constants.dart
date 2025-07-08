@@ -1,9 +1,3 @@
-/// BLE Constants for DisasterLink P2P Messaging
-///
-/// This file defines the UUIDs, protocol constants, and other fixed values
-/// used throughout the BLE P2P messaging system.
-library ble_constants;
-
 /// Custom BLE Service UUID for DisasterLink Emergency Communication
 /// This service handles all emergency messaging between devices
 const String kDisasterLinkServiceUuid = 'b32b86a1-a04c-4db3-8276-b17ec127dab1';
