@@ -85,7 +85,11 @@ class BlePeripheralService {
           break;
         case 'onMessageReceived':
           print('DEBUG_PERIPHERAL: Message received from Kotlin side');
-          _handleMessageReceived(call.arguments);
+          final Map<String, dynamic> arguments =
+              (call.arguments as Map<Object?, Object?>).map(
+                (key, value) => MapEntry(key.toString(), value),
+              );
+          _handleMessageReceived(arguments);
           break;
         case 'onAdvertisingStarted':
           _handleAdvertisingStarted();
